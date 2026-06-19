@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"  # Trigger on version tags like v0.1.0, v1.2.3
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # To create GitHub Release
+      id-token: write        # For PyPI trusted publishing (if enabled)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # Fetch all history for changelog generation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tools
+        run: |
+          pip install --upgrade pip build
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Generate release notes from commits since the last tag
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.whl
+          body: |
+            See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+
+      # Optional: publish to PyPI (uncomment and configure when ready)
+      # - name: Publish to PyPI
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     skip-existing: true

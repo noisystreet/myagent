@@ -1,0 +1,25 @@
+# Each line is a file pattern followed by one or more owners.
+# Order matters: the last matching pattern takes precedence.
+# More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global fallback — no default owner (optional: set to @org/team)
+# * @user-or-team
+
+# Core modules
+/src/core/        @gzz
+/src/llm/         @gzz
+/src/nodes/       @gzz
+/src/tools/       @gzz
+
+# CLI entry point
+/src/main.py      @gzz
+
+# Docs (architecture, design decisions)
+/docs/adr/        @gzz
+/docs/plan.md     @gzz
+
+# CI/CD and project config
+/.github/         @gzz
+/.pre-commit-config.yaml  @gzz
+/pyproject.toml   @gzz
+/Makefile         @gzz
