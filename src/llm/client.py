@@ -29,6 +29,7 @@ class LLMClient:
         model_name: str = "gpt-4o",
         temperature: float = 0.0,
         max_retries: int = 3,
+        *,
         api_key: str | None = None,
         base_url: str | None = None,
     ):

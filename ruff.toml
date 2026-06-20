@@ -1,0 +1,26 @@
+# ruff configuration — single source of truth
+# Used by both pre-commit (local ruff) and CI (pinned ruff from requirements.txt)
+
+target-version = "py311"
+line-length = 100
+
+# Enable preview mode for the latest rule set (including PLC0415, etc.)
+preview = true
+
+[lint]
+select = ["E", "F", "W", "I", "N", "UP", "C9", "PL"]
+
+[lint.per-file-ignores]
+"tests/*" = ["PLR0915", "C901", "PLR0911"]
+"src/llm/client.py" = ["PLR0913"]
+"src/nodes/planner.py" = ["E501"]
+"src/tools/command_tools.py" = ["PLW1509"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-statements = 150
+
+[format]
+quote-style = "double"
