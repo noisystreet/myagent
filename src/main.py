@@ -10,6 +10,12 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from .core.config import AgentConfig
+from .core.display import (
+    display_banner,
+    display_result,
+    display_stream_event,
+    display_turn_summary,
+)
 from .core.graph import build_graph
 from .core.state import CodingAgentState
 from .core.stream import Spinner, run_streaming
@@ -47,7 +53,7 @@ def run_once(graph, state: CodingAgentState, task: str, config: dict) -> CodingA
     spinner.start()
     for event in run_streaming(graph, state, config):
         spinner.stop()
-        _display_stream_event(event)
+        display_stream_event(event)
         final_state = event.data
         spinner = Spinner("Thinking...")
         spinner.start()
@@ -65,7 +71,7 @@ def main():
     if prompt:
         state = _new_state(str(workspace), config.max_steps)
         state = run_once(graph, state, prompt, thread_config)
-        _display_result(state)
+        display_result(state)
     else:
         _interactive_loop(graph, str(workspace), config.max_steps)
 
@@ -122,44 +128,13 @@ def _setup(config):
     return llm, graph, workspace
 
 
-def _display_result(state: CodingAgentState):
-    """Print execution result."""
-    output = state.get("final_output") or "No output generated."
-    print("\n" + "=" * 60 + f"\n{output}\n" + "=" * 60)
-    mode = state.get("mode", "task")
-    steps = state.get("step_attempts", 0)
-    errors = len(state.get("errors", []))
-    print(f"\nMode: {mode} | Steps: {steps} | Errors: {errors}")
-
-
-def _display_stream_event(event):
-    """Render a single streaming event to the terminal."""
-    node = event.node
-    kind = event.kind
-    content = event.content
-
-    if kind == "start":
-        print(f"\n── [{node}] {content} ──")
-    elif kind == "interim":
-        if content:
-            print(f"\n[{node}]\n{content}")
-    elif kind == "tool_result":
-        if content:
-            print(f"\n{content}")
-    elif kind == "error":
-        print(f"\n⚠ [{node}] Error:\n{content}")
-    elif kind == "end":
-        print(f"\n{'=' * 60}\n{content}\n{'=' * 60}")
-
-
 def _interactive_loop(graph, workspace: str, max_steps: int):
     """Run interactive REPL with cross-turn memory."""
     state = _new_state(workspace, max_steps)
     thread_config = {"configurable": {"thread_id": str(uuid.uuid4())}}
     msg_count = 0
 
-    print("myagent interactive mode. Type 'exit' to quit. Type 'new' for a fresh session.")
-    print("=" * 60)
+    display_banner()
 
     while True:
         try:
@@ -180,10 +155,7 @@ def _interactive_loop(graph, workspace: str, max_steps: int):
             mode = state.get("mode", "?")
             errors = len(state.get("errors", []))
             msg_pairs = len(state.get("messages", [])) // 2
-            summary = f"─── Turn {msg_count} | Msgs: {msg_pairs} pairs | Mode: {mode}"
-            if errors:
-                summary += f" | ⚠ {errors} error(s)"
-            print(summary + " ───")
+            display_turn_summary(msg_count, msg_pairs, mode, errors)
 
         except KeyboardInterrupt:
             print("\nBye!")
