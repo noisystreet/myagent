@@ -217,7 +217,18 @@ three-layer strategy: structured output → instructed JSON → free text infere
 - **Size limit**: effective changes ≤ 400 lines (excluding tests, config, generated code)
 - **Description required**: change summary + test strategy + impact scope
 - **AI annotation**: AI-generated code must be marked with `🤖 AI-generated` in the PR description
-- **Checklist before merge**: `make test` and `make lint` pass, CHANGELOG and docs updated
+- **AI self-check checklist** (must be verified before declaring task complete):
+
+  | # | Check | Why |
+  |---|-------|-----|
+  | 1 | ✅ Run `make lint` — ruff must pass | Ruff 版本不同会导致 CI 失败 |
+  | 2 | ✅ Run `make test` — all tests pass | 不改坏已有功能 |
+  | 3 | ✅ Run `make complexity` — lizard no warnings | 圈复杂度超标会被 CI 拒绝 |
+  | 4 | ✅ Create/fix PR on GitHub (`gh pr create`) | 分支推了 PR 没创建等于没做 |
+  | 5 | ✅ Verify CI passes on the PR | 合并前必须绿色 |
+  | 6 | ✅ Update `AGENTS.md` if adding/changing constraints | 约定要落地到文档 |
+  | 7 | ✅ Update `CHANGELOG.md` if user-facing change | 用户需要知道变更 |
+  | 8 | ✅ Bilingual commit format (`<type>(<scope>): EN` + `<type>(<scope>): 中文`) | 提交规范必须遵守 |
 
 ### Versioning & Release
 
