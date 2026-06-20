@@ -29,12 +29,10 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        env:
-          PIP_INDEX_URL: https://pypi.org/simple/
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .
+          pip install --index-url https://pypi.org/simple/ -r requirements.txt
+          pip install --index-url https://pypi.org/simple/ -e .
 
       - name: Lint with ruff
         run: |

@@ -4,8 +4,6 @@
 #
 #    pip-compile --extra=dev --output-file=requirements.txt pyproject.toml
 #
---index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-
 aiohappyeyeballs==2.6.2
     # via aiohttp
 aiohttp==3.14.1
