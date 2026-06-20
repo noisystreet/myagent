@@ -34,3 +34,35 @@ class ToolCallSchema(BaseModel):
         default="",
         description="Brief explanation of what is being done",
     )
+
+
+class CodeBlock(BaseModel):
+    """A single code block with syntax highlighting metadata."""
+
+    language: str | None = Field(
+        default=None,
+        description=(
+            "Programming language for syntax highlighting, e.g. 'python', 'javascript', 'bash'"
+        ),
+    )
+    code: str = Field(description="The code content")
+    caption: str | None = Field(
+        default=None,
+        description="Optional caption or title for the code block",
+    )
+
+
+class ChatResponse(BaseModel):
+    """Structured chat response with code blocks and references."""
+
+    explanation: str = Field(
+        description="Main explanatory text in markdown format. Keep it concise."
+    )
+    code_blocks: list[CodeBlock] = Field(
+        default_factory=list,
+        description="Code blocks to render with syntax highlighting. Separate from explanation.",
+    )
+    references: list[str] = Field(
+        default_factory=list,
+        description="Referenced file paths, URLs, or documentation links",
+    )
