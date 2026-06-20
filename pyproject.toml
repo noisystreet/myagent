@@ -27,6 +27,11 @@ dev = [
 [project.scripts]
 myagent = "src.main:main"
 
+[project.urls]
+Homepage = "https://github.com/noisystreet/myagent"
+Repository = "https://github.com/noisystreet/myagent"
+BugTracker = "https://github.com/noisystreet/myagent/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

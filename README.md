@@ -1,5 +1,7 @@
 # myagent
 
+[![CI](https://github.com/noisystreet/myagent/actions/workflows/ci.yml/badge.svg)](https://github.com/noisystreet/myagent/actions/workflows/ci.yml)
+
 A **LangGraph-based programming agent** that understands natural language instructions and automates coding, debugging, and refactoring tasks.
 
 ## Quick Start
