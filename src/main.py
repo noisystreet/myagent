@@ -1,5 +1,6 @@
 """CLI entry point for the coding agent."""
 
+import argparse
 import logging
 import uuid
 from pathlib import Path
@@ -61,8 +62,6 @@ def main():
 
 def _parse_args():
     """Parse CLI arguments."""
-    import argparse
-
     parser = argparse.ArgumentParser(description="myagent — a LangGraph-based programming agent")
     parser.add_argument(
         "prompt", nargs="*", help="Task description. If omitted, enters interactive mode."
