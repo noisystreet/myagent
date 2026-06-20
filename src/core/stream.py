@@ -5,6 +5,9 @@ events for real-time output in the interactive CLI.
 """
 
 import logging
+import sys
+import threading
+import time
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import Any
@@ -12,6 +15,54 @@ from typing import Any
 from ..core.state import CodingAgentState
 
 logger = logging.getLogger(__name__)
+
+_SPINNER_CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+class Spinner:
+    """A simple CLI spinner that runs in a background thread.
+
+    Usage:
+        with Spinner("Thinking..."):
+            time.sleep(3)
+    """
+
+    def __init__(self, message: str = ""):
+        self._message = message
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, *args):
+        self.stop()
+
+    def start(self):
+        """Start the spinner in a daemon thread."""
+        self._running = True
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        """Stop the spinner and clear the line."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=0.5)
+        sys.stdout.write("\r" + " " * 80 + "\r")
+        sys.stdout.flush()
+
+    def _spin(self):
+        """Print spinner characters in a loop."""
+        idx = 0
+        while self._running:
+            char = _SPINNER_CHARS[idx % len(_SPINNER_CHARS)]
+            msg = f"\r{char} {self._message}" if self._message else f"\r{char}"
+            sys.stdout.write(msg)
+            sys.stdout.flush()
+            idx += 1
+            time.sleep(0.1)
 
 
 @dataclass
