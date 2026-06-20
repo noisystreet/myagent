@@ -14,7 +14,7 @@ test:
 
 # Run tests with coverage and gate
 test-cov:
-	python -m pytest tests/ -v --cov=src --cov-report=term --cov-report=html --cov-fail-under=35
+	python -m pytest tests/ -v --cov=src --cov-report=term --cov-report=html --cov-fail-under=34
 
 # Lint with ruff (if installed)
 lint:

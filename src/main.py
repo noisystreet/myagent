@@ -12,6 +12,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from .core.config import AgentConfig
 from .core.graph import build_graph
 from .core.state import CodingAgentState
+from .core.stream import run_streaming
 from .llm.client import LLMClient
 
 load_dotenv()
@@ -38,11 +39,14 @@ def _new_state(workspace: str, max_steps: int) -> CodingAgentState:
 
 
 def run_once(graph, state: CodingAgentState, task: str, config: dict) -> CodingAgentState:
-    """Run a single turn: append user message, invoke graph, return new state."""
+    """Run a single turn with streaming: append user message, invoke graph, return final state."""
     state["messages"].append(HumanMessage(content=task))
     logger.info("Running: %s", task)
-    result = graph.invoke(dict(state), config)  # pass a copy to avoid mutation issues
-    return result
+    final_state = state
+    for event in run_streaming(graph, state, config):
+        _display_stream_event(event)
+        final_state = event.data
+    return final_state
 
 
 def main():
@@ -113,6 +117,26 @@ def _display_result(state: CodingAgentState):
     print(f"\nMode: {mode} | Steps: {steps} | Errors: {errors}")
 
 
+def _display_stream_event(event):
+    """Render a single streaming event to the terminal."""
+    node = event.node
+    kind = event.kind
+    content = event.content
+
+    if kind == "start":
+        print(f"\n── [{node}] {content} ──")
+    elif kind == "interim":
+        if content:
+            print(f"\n[{node}]\n{content}")
+    elif kind == "tool_result":
+        if content:
+            print(f"\n{content}")
+    elif kind == "error":
+        print(f"\n⚠ [{node}] Error:\n{content}")
+    elif kind == "end":
+        print(f"\n{'=' * 60}\n{content}\n{'=' * 60}")
+
+
 def _interactive_loop(graph, workspace: str, max_steps: int):
     """Run interactive REPL with cross-turn memory."""
     state = _new_state(workspace, max_steps)
@@ -138,16 +162,13 @@ def _interactive_loop(graph, workspace: str, max_steps: int):
 
             state = run_once(graph, state, task, thread_config)
             msg_count += 1
-
-            output = state.get("final_output") or "(no response)"
             mode = state.get("mode", "?")
-            errors = state.get("errors", [])
-
-            print(f"\n[{mode}]\n{output}")
-            if errors:
-                print(f"  ⚠ {len(errors)} error(s)")
+            errors = len(state.get("errors", []))
             msg_pairs = len(state.get("messages", [])) // 2
-            print(f"─── Turn {msg_count} | Messages: {msg_pairs} pairs | Mode: {mode} ───")
+            summary = f"─── Turn {msg_count} | Msgs: {msg_pairs} pairs | Mode: {mode}"
+            if errors:
+                summary += f" | ⚠ {errors} error(s)"
+            print(summary + " ───")
 
         except KeyboardInterrupt:
             print("\nBye!")
