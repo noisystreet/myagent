@@ -22,7 +22,7 @@ VALID_TYPES = {"feat", "fix", "refactor", "test", "docs", "chore", "style"}
 VALID_SCOPES = {"core", "llm", "nodes", "tools", "cli", "ci", "docs", "chore"}
 
 # Pattern: <type>(<scope>): <subject>
-PATTERN = re.compile(r"^(?P<type>\w+)(?:\((?P<scope>\w+)\))?:\s+(?P<subject>.+)$")
+PATTERN = re.compile(r"^(?P<type>\w+)\((?P<scope>\w+)\):\s+(?P<subject>.+)$")
 
 
 def main():
