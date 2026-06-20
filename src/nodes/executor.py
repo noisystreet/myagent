@@ -29,6 +29,33 @@ run_command(command="python hello.py")
 """
 
 
+# C7 L1: Block known prompt injection patterns in tool arguments
+_SANITIZATION_PATTERNS = [
+    re.compile(r"(?i)(ignore\s+(previous|all)\s*(instructions?|directives?))"),
+    re.compile(r"(?i)(you\s+are\s+now)"),
+    re.compile(r"(?i)(system\s*:\s*)"),
+    re.compile(r"(?i)(<\s*/?\s*syst(?:em)?\s*>?)"),
+    re.compile(r"```"),
+]
+
+
+def _sanitize_tool_args(args: dict) -> tuple[dict, list[str]]:
+    """Sanitize tool arguments against prompt injection.
+
+    Returns sanitized args and a list of warnings.
+    """
+    warnings: list[str] = []
+    for key, value in args.items():
+        if not isinstance(value, str):
+            continue
+        for pattern in _SANITIZATION_PATTERNS:
+            if pattern.search(value):
+                warnings.append(f"Suspicious pattern in '{key}': {pattern.pattern[:60]}")
+                # Strip the matched portion
+                args[key] = pattern.sub("[REDACTED]", value)
+    return args, warnings
+
+
 def executor_node(state: CodingAgentState, llm: LLMClient, registry: ToolRegistry) -> dict:
     """Execute the current step using LLM-selected tools."""
     step = state["plan"][state["current_step"]]
@@ -60,14 +87,13 @@ def executor_node(state: CodingAgentState, llm: LLMClient, registry: ToolRegistr
 
     errors = [r.error for r in results if not r.success]
 
+    # Always route to reflector — do NOT increment current_step here.
+    # The reflector decides whether to advance (continue) or retry (stay).
     return {
         "tool_results": state.get("tool_results", []) + results,
         "errors": errors,
         "step_attempts": state.get("step_attempts", 0) + 1,
-        "current_step": state["current_step"] + (1 if not errors else 0),
-        "next_action": "output"
-        if errors or state["current_step"] >= len(state["plan"]) - 1
-        else "executor",
+        "next_action": "reflector",
     }
 
 
@@ -76,6 +102,8 @@ def _resolve_and_run(
 ) -> ToolResult:
     """Resolve paths and execute a parsed tool call."""
     tool_name, args = tool_call
+    # C7 L1: Sanitize before execution
+    args, _warnings = _sanitize_tool_args(args)
     for key in ("path", "cwd"):
         if key in args and args[key] and not args[key].startswith("/"):
             args[key] = str(Path(workspace) / args[key])

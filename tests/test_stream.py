@@ -96,14 +96,14 @@ class TestEventFromNode:
         output = {"tool_results": [result], "errors": ["not found"], "current_step": 1}
         event = _event_from_node("executor", output)
         assert event.node == "executor"
-        assert event.kind == "tool_result"
+        assert event.kind == "error"
         assert "✗" in event.content
 
     def test_executor_no_results(self):
         output = {"tool_results": [], "errors": [], "current_step": 0}
         event = _event_from_node("executor", output)
-        assert event.kind in {"tool_result", "error"}
-        assert event.content
+        assert event.kind == "interim"
+        assert event.content == "Executing..."
 
     def test_chat_with_final_output(self):
         output = {"final_output": "Hello!", "messages": []}
@@ -149,3 +149,83 @@ class TestEventFromNode:
         event = _event_from_node("planner", {})
         assert event.node == "planner"
         assert event.kind == "interim"
+
+    def test_reflector_continue(self):
+        output = {
+            "next_action": "continue",
+            "current_step": 1,
+            "plan": ["echo hello", "g++ hello.cpp", "./hello"],
+            "reflections": [{"step_index": 0, "verdict": "continue", "reason": "Step succeeded"}],
+        }
+        event = _event_from_node("reflector", output)
+        assert event.node == "reflector"
+        assert event.kind == "interim"
+        assert event.content.startswith("→ CONTINUE")
+        assert "g++" in event.content  # next step preview
+        assert "Next:" not in event.content  # no "Next:" prefix
+
+    def test_reflector_continue_dict_plan(self):
+        output = {
+            "next_action": "continue",
+            "current_step": 1,
+            "plan": [
+                {"action": "write_file", "description": "Create source"},
+                {"action": "run_command", "description": "Compile"},
+            ],
+            "reflections": [{"step_index": 0, "verdict": "continue", "reason": "OK"}],
+        }
+        event = _event_from_node("reflector", output)
+        assert "run_command" in event.content
+        assert "Compile" in event.content
+
+    def test_reflector_continue_no_next_step(self):
+        """When current_step is beyond plan, just verdict."""
+        output = {
+            "next_action": "continue",
+            "current_step": 99,
+            "plan": ["a", "b"],
+            "reflections": [{"step_index": 0, "verdict": "continue", "reason": "OK"}],
+        }
+        event = _event_from_node("reflector", output)
+        assert event.content == "→ CONTINUE"
+
+    def test_reflector_retry(self):
+        output = {
+            "next_action": "retry",
+            "reflections": [
+                {
+                    "step_index": 1,
+                    "verdict": "retry",
+                    "reason": "File not found",
+                    "suggestion": "Use src/main.py",
+                },
+            ],
+        }
+        event = _event_from_node("reflector", output)
+        assert event.kind == "error"
+        assert event.content == "↻ RETRY"
+
+    def test_reflector_done(self):
+        output = {
+            "next_action": "done",
+            "completed": True,
+            "reflections": [{"step_index": 2, "verdict": "done", "reason": "Task complete"}],
+        }
+        event = _event_from_node("reflector", output)
+        assert event.kind == "end"
+        assert event.content == "✓ DONE"
+
+    def test_reflector_replan(self):
+        output = {
+            "next_action": "replan",
+            "reflections": [{"step_index": 0, "verdict": "replan", "reason": "Plan invalid"}],
+        }
+        event = _event_from_node("reflector", output)
+        assert event.kind == "start"
+        assert event.content == "⟳ REPLAN"
+
+    def test_reflector_empty_reflections(self):
+        output = {"reflections": []}
+        event = _event_from_node("reflector", output)
+        assert event.kind == "interim"
+        assert event.content == "Reflecting..."

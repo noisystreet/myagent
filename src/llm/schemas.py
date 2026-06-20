@@ -66,3 +66,18 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Referenced file paths, URLs, or documentation links",
     )
+
+
+class ReflectDecision(BaseModel):
+    """Decision made by the reflector after observing a step result."""
+
+    verdict: Literal["continue", "retry", "replan", "done", "interrupt"] = Field(
+        description="Next action after observing the step result"
+    )
+    reason: str = Field(description="Human-readable explanation of the decision (max 500 chars)")
+    suggestion: str | None = Field(
+        default=None, description="Hint for retry/replan (max 200 chars)"
+    )
+    severity: Literal["info", "warning", "error", "critical"] = Field(
+        default="info", description="Severity level of the observed situation"
+    )
