@@ -90,6 +90,22 @@ class ToolResult(dict):
         )
 
 
+def tool_result_to_text(r: "ToolResult | dict") -> str:
+    """Safely render a ToolResult or its plain-dict form as text.
+
+    After msgpack round-trip via checkpointer, ToolResult may become a plain dict.
+    This helper works for both forms.
+    """
+    if isinstance(r, ToolResult) and hasattr(r, "to_text"):
+        return r.to_text()
+    parts: list[str] = []
+    if r.get("error"):
+        parts.append(str(r.get("error")))
+    if r.get("data"):
+        parts.append(str(r.get("data")))
+    return "\n".join(parts)
+
+
 class CodingAgentState(TypedDict):
     """State of the coding agent graph."""
 

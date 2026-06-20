@@ -12,7 +12,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..core.state import CodingAgentState
+from ..core.state import CodingAgentState, tool_result_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +130,11 @@ def _handle_executor(node_name: str, output: dict) -> StreamEvent:
     errors = output.get("errors", [])
     parts: list[str] = []
     for r in tool_results:
-        status = "✓" if r.success else "✗"
-        text = r.to_text()
-        parts.append(f"  {status} {r.tool_name}" + (f": {text[:120]}" if text else ""))
+        success = r.get("success") if isinstance(r, dict) else r.success
+        name = r.get("tool_name", "?") if isinstance(r, dict) else r.tool_name
+        status = "✓" if success else "✗"
+        text = tool_result_to_text(r)
+        parts.append(f"  {status} {name}" + (f": {text[:120]}" if text else ""))
     if errors:
         for e in errors:
             parts.append(f"  ⚠ {e[:120]}")

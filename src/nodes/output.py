@@ -2,7 +2,7 @@
 
 from langchain_core.messages import AIMessage
 
-from ..core.state import CodingAgentState
+from ..core.state import CodingAgentState, tool_result_to_text
 from ..llm.client import LLMClient
 
 OUTPUT_SYSTEM_PROMPT = """\
@@ -22,7 +22,10 @@ def output_node(state: CodingAgentState, llm: LLMClient) -> dict:
     errors = state.get("errors", [])
 
     result_summary = "\n".join(
-        f"  [{'✓' if r.success else '✗'}] {r.tool_name}: {r.to_text()}" for r in results
+        f"  [{'✓' if (r.get('success') if isinstance(r, dict) else r.success) else '✗'}] "
+        f"{r.get('tool_name', '?') if isinstance(r, dict) else r.tool_name}: "
+        f"{tool_result_to_text(r)}"
+        for r in results
     )
 
     summary = llm.invoke(
