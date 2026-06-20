@@ -125,25 +125,22 @@ def _handle_planner(node_name: str, output: dict) -> StreamEvent:
 
 
 def _handle_executor(node_name: str, output: dict) -> StreamEvent:
-    """Build event for the executor node."""
+    """Build event for the executor node — only shows current step result."""
     tool_results = output.get("tool_results", [])
-    errors = output.get("errors", [])
-    parts: list[str] = []
-    for r in tool_results:
-        success = r.get("success") if isinstance(r, dict) else r.success
-        name = r.get("tool_name", "?") if isinstance(r, dict) else r.tool_name
-        status = "✓" if success else "✗"
-        text = tool_result_to_text(r)
-        parts.append(f"  {status} {name}" + (f": {text[:120]}" if text else ""))
-    if errors:
-        for e in errors:
-            parts.append(f"  ⚠ {e[:120]}")
+
+    if not tool_results:
+        return StreamEvent(node=node_name, kind="interim", content="Executing...", data=output)
+
+    # Only display the latest result (current step), not accumulated history
+    latest = tool_results[-1]
+    success = latest.get("success") if isinstance(latest, dict) else latest.success
+    name = latest.get("tool_name", "?") if isinstance(latest, dict) else latest.tool_name
+    text = tool_result_to_text(latest)
+    status = "✓" if success else "✗"
+    content = f"{status} {name}" + (f": {text[:120]}" if text else "")
 
     return StreamEvent(
-        node=node_name,
-        kind="tool_result" if tool_results else "error",
-        content="\n".join(parts) if parts else "Executing...",
-        data=output,
+        node=node_name, kind="tool_result" if success else "error", content=content, data=output
     )
 
 
@@ -171,6 +168,46 @@ def _handle_output(node_name: str, output: dict) -> StreamEvent:
     )
 
 
+def _handle_reflector(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the reflector node — concise single-line status."""
+    reflections = output.get("reflections", [])
+    if not reflections:
+        return StreamEvent(node=node_name, kind="interim", content="Reflecting...", data=output)
+
+    latest = reflections[-1]
+    verdict = latest.get("verdict", "?")
+
+    _verdict_icons = {
+        "continue": "→",
+        "retry": "↻",
+        "replan": "⟳",
+        "done": "✓",
+        "interrupt": "⚠",
+    }
+    icon = _verdict_icons.get(verdict, "?")
+    kind_map = {"done": "end", "retry": "error", "replan": "start"}
+    event_kind = kind_map.get(verdict, "interim")
+
+    # Single line: icon + verdict + optional next step for continue
+    content = f"{icon} {verdict.upper()}"
+    if verdict == "continue":
+        next_idx = output.get("current_step", 0)
+        plan = output.get("plan", [])
+        if plan and next_idx < len(plan):
+            content += f" → {_format_plan_step(plan[next_idx])}"
+
+    return StreamEvent(node=node_name, kind=event_kind, content=content, data=output)
+
+
+def _format_plan_step(step: str | dict) -> str:
+    """Format a single plan step for display."""
+    if isinstance(step, dict):
+        action = step.get("action", "?")
+        desc = step.get("description", "")
+        return f"{action}{f' — {desc}' if desc else ''}"
+    return str(step)
+
+
 def _default_handler(node_name: str, output: dict) -> StreamEvent:
     """Fallback handler for unknown nodes."""
     return StreamEvent(node=node_name, kind="interim", content=str(output), data=output)
@@ -180,6 +217,7 @@ _NODE_HANDLERS: dict[str, Callable[[str, dict], StreamEvent]] = {
     "intent_router": _handle_intent_router,
     "planner": _handle_planner,
     "executor": _handle_executor,
+    "reflector": _handle_reflector,
     "chat": _handle_chat,
     "output": _handle_output,
 }

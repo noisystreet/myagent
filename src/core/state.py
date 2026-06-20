@@ -1,5 +1,6 @@
 """State definitions for the coding agent."""
 
+import operator
 from typing import Annotated, Literal, TypedDict
 
 from langchain_core.messages import AnyMessage
@@ -129,8 +130,21 @@ class CodingAgentState(TypedDict):
     # --- Control flow ---
     mode: Literal["chat", "task"]  # Intent classification
     next_action: Literal[
-        "intent_router", "chat", "planner", "executor", "evaluator", "output", "end"
+        "intent_router",
+        "chat",
+        "planner",
+        "executor",
+        "reflector",
+        "output",
+        "end",
     ]
 
     # --- Output ---
     final_output: str | None
+
+    # --- Rolling loop (Phase 1) ---
+    reflections: Annotated[list[dict], operator.add]  # reflection history
+    loop_count: int  # total reflector iterations
+    max_loops: int  # global loop cap, default 30
+    max_retries: int  # per-step retry cap, default 2
+    completed: bool  # reflector marks task complete
