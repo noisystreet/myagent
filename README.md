@@ -1,6 +1,11 @@
 # myagent
 
 [![CI](https://github.com/noisystreet/myagent/actions/workflows/ci.yml/badge.svg)](https://github.com/noisystreet/myagent/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen)](https://pre-commit.com/)
+[![PyPI](https://img.shields.io/pypi/v/myagent?label=PyPI)](https://pypi.org/project/myagent/)
 
 A **LangGraph-based programming agent** that understands natural language instructions and automates coding, debugging, and refactoring tasks.
 

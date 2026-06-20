@@ -1,5 +1,12 @@
 # myagent
 
+[![CI](https://github.com/noisystreet/myagent/actions/workflows/ci.yml/badge.svg)](https://github.com/noisystreet/myagent/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen)](https://pre-commit.com/)
+[![PyPI](https://img.shields.io/pypi/v/myagent?label=PyPI)](https://pypi.org/project/myagent/)
+
 基于 **LangGraph** 的编程 Agent — 能理解自然语言指令，自动完成代码编写、调试、重构等软件工程任务。
 
 ## 快速开始
