@@ -2,6 +2,8 @@
 
 import json
 import logging
+import os
+import re
 import time
 from typing import Any
 
@@ -42,11 +44,9 @@ class LLMClient:
     @staticmethod
     def _resolve_key(model_name: str, api_key: str | None) -> str | None:
         """Resolve API key: explicit parameter > LLM_API_KEY env var."""
-        import os as _os
-
         if api_key:
             return api_key
-        return _os.getenv("LLM_API_KEY")
+        return os.getenv("LLM_API_KEY")
 
     @staticmethod
     def _build_model(
@@ -244,10 +244,8 @@ def _describe_type(annotation: Any) -> str:
 
 def _extract_json(text: str) -> str:
     """Extract JSON from text, handling ```json ... ``` markers."""
-    import re as _re
-
     # Try to find JSON code block
-    match = _re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, _re.DOTALL)
+    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if match:
         return match.group(1).strip()
     # Try to find {...} or [...] directly
