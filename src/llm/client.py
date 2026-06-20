@@ -75,8 +75,9 @@ class LLMClient:
         system: str = "",
         schema: type[BaseModel] | None = None,
         messages: list | None = None,
-    ) -> str | BaseModel:
-        """Invoke LLM with optional structured output.
+        tools: list[dict] | None = None,
+    ) -> str | BaseModel | Any:
+        """Invoke LLM with optional structured output or tool binding.
 
         Falls back to text + JSON parsing when the model doesn't
         support native structured output.
@@ -86,9 +87,12 @@ class LLMClient:
             system: Optional system message prepended when using prompt.
             schema: Optional Pydantic model for structured output.
             messages: Full message list (overrides prompt + system).
+            tools: Optional list of tool definitions for function calling
+                   (OpenAI/DeepSeek compatible format).
 
         Returns:
-            Content string or a Pydantic instance if schema provided.
+            Content string, a Pydantic instance if schema provided,
+            or an AIMessage if tools are used.
         """
         last_error = None
         skip_schema = self.model_name in _MODELS_WITHOUT_STRUCTURED_OUTPUT
@@ -96,7 +100,7 @@ class LLMClient:
         for attempt in range(self.max_retries):
             try:
                 msgs = self._build_messages(prompt, system, messages)
-                return self._model_call(msgs, schema, skip_schema)
+                return self._model_call(msgs, schema, skip_schema, tools)
 
             except Exception as e:
                 last_error = e
@@ -136,9 +140,15 @@ class LLMClient:
         return msgs
 
     def _model_call(
-        self, msgs: list, schema: type[BaseModel] | None, skip_schema: bool
-    ) -> str | BaseModel:
-        """Execute model call with optional structured output."""
+        self,
+        msgs: list,
+        schema: type[BaseModel] | None,
+        skip_schema: bool,
+        tools: list[dict] | None,
+    ) -> str | BaseModel | Any:
+        """Execute model call with optional structured output or tool binding."""
+        if tools:
+            return self._model.bind_tools(tools).invoke(msgs)  # type: ignore
         if schema and not skip_schema:
             return self._model.with_structured_output(schema).invoke(msgs)  # type: ignore
         return self._model.invoke(msgs).content  # type: ignore
