@@ -122,8 +122,11 @@ def display_banner() -> None:
 
 
 def _render_smart(text: str) -> Panel | Markdown | str:
-    """Render content as code block, markdown, or plain text."""
-    # If it looks like code (multi-line with indentation or shell output), syntax highlight
+    """Render content as markdown, code block, or plain text."""
+    # If it contains markdown syntax, render as markdown first so code blocks
+    # inside markdown are properly highlighted by Rich.
+    if _looks_like_markdown(text):
+        return _render_markdown(text)
     if _looks_like_code(text):
         return Syntax(text, "python" if _is_python_code(text) else "text", theme="monokai")
     return _render_markdown(text)
@@ -138,6 +141,12 @@ def _render_markdown(text: str) -> Markdown | str:
     except Exception:
         pass
     return text
+
+
+def _looks_like_markdown(text: str) -> bool:
+    """Heuristic: contains markdown indicators like headers, code blocks, or emphasis."""
+    markers = ("```", "#", "**", "__", "[", "](", "- ", "> ", "|")
+    return any(marker in text for marker in markers)
 
 
 _MIN_CODE_LINES = 2

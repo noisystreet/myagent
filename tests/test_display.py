@@ -3,6 +3,7 @@
 from src.core.display import (
     _is_python_code,
     _looks_like_code,
+    _looks_like_markdown,
     _render_markdown,
     _render_smart,
     display_banner,
@@ -59,6 +60,29 @@ class TestRenderMarkdown:
         assert result is not None
 
 
+class TestLooksLikeMarkdown:
+    def test_code_fence(self):
+        assert _looks_like_markdown("```python\ncode\n```")
+
+    def test_header(self):
+        assert _looks_like_markdown("# Title")
+
+    def test_bold(self):
+        assert _looks_like_markdown("**bold**")
+
+    def test_link(self):
+        assert _looks_like_markdown("[text](url)")
+
+    def test_list(self):
+        assert _looks_like_markdown("- item")
+
+    def test_plain_text(self):
+        assert not _looks_like_markdown("hello world")
+
+    def test_python_code_no_markdown(self):
+        assert not _looks_like_markdown("import os\nprint('hi')")
+
+
 class TestRenderSmart:
     def test_plain_text(self):
         result = _render_smart("hello world")
@@ -66,6 +90,17 @@ class TestRenderSmart:
 
     def test_python_code(self):
         result = _render_smart("import os\nprint('hi')")
+        assert result is not None
+
+    def test_markdown_with_code_blocks(self):
+        text = "# Hello\n\n```python\nimport os\n```\n"
+        result = _render_smart(text)
+        assert result is not None
+
+    def test_markdown_priority_over_code_heuristic(self):
+        # This text has some indented lines but is clearly markdown
+        text = "**Note**\n\n```bash\necho hi\n```\n"
+        result = _render_smart(text)
         assert result is not None
 
 
