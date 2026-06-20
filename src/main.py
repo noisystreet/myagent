@@ -127,7 +127,7 @@ def _interactive_loop(graph, workspace: str, max_steps: int):
             task = input("\n❯ ").strip()
             if not task:
                 continue
-            if task.lower() in ("exit", "quit", "q"):
+            if task.lower() in {"exit", "quit", "q"}:
                 break
             if task.lower() == "new":
                 state = _new_state(workspace, max_steps)

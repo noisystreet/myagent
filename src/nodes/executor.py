@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 from pathlib import Path
 
 from ..core.state import CodingAgentState, ToolResult
@@ -217,8 +218,6 @@ def _try_infer_from_text(text: str) -> tuple[str, dict] | None:
 
 def _run_tool(tool_name: str, args: dict) -> ToolResult:
     """Dispatch to the correct tool function."""
-    import time
-
     start = time.perf_counter()
 
     try:
