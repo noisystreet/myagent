@@ -29,7 +29,11 @@ def run_command(command: str, cwd: str | None = None, timeout: int = MAX_TIMEOUT
             preexec_fn=os.setsid,  # isolate in a new process group
         )
     except Exception as e:
-        return ToolResult("run_command", False, error=f"Execution failed: {e}")
+        return ToolResult(
+            "run_command",
+            False,
+            error={"type": "execution_failed", "message": f"Execution failed: {e}"},
+        )
 
     try:
         stdout, stderr = proc.communicate(timeout=timeout)
@@ -39,14 +43,23 @@ def run_command(command: str, cwd: str | None = None, timeout: int = MAX_TIMEOUT
         return ToolResult(
             "run_command",
             False,
-            error=f"Command timed out after {timeout}s",
-            data=(stdout or "")[:MAX_OUTPUT_SIZE],
+            error={"type": "timeout", "message": f"Command timed out after {timeout}s"},
+            data={"command": command, "output": (stdout or "")[:MAX_OUTPUT_SIZE]},
         )
 
     output = (stdout or "") + (stderr or "")
     truncated = output[:MAX_OUTPUT_SIZE]
 
     if proc.returncode == 0:
-        return ToolResult("run_command", True, data=truncated)
+        return ToolResult(
+            "run_command",
+            True,
+            data={"command": command, "return_code": 0, "output": truncated},
+        )
     else:
-        return ToolResult("run_command", False, error=truncated)
+        return ToolResult(
+            "run_command",
+            False,
+            error={"type": "non_zero_exit", "message": f"Exit code {proc.returncode}"},
+            data={"command": command, "return_code": proc.returncode, "output": truncated},
+        )
