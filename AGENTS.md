@@ -116,7 +116,7 @@ Example: `fix(nodes): handle empty plan gracefully`, not `fix(misc)` or `fix(oth
 
 ```bash
 make install    # Install dependencies
-make test-cov   # Run tests with coverage gate (≥70%)
+make test-cov   # Run tests with coverage gate (≥35%)
 make lint       # ruff code linting
 make complexity # Cyclomatic complexity + line length check (lizard)
 make audit      # Dependency vulnerability audit
