@@ -63,7 +63,7 @@ def test_registry_custom_name():
 def test_registry_with_real_tools():
     """Verify real tools produce valid schemas."""
     reg = ToolRegistry(ALL_TOOLS)
-    assert reg.known_tools == {"read_file", "write_file", "edit_file", "run_command"}
+    assert reg.known_tools == {"read_file", "write_file", "edit_file", "run_command", "get_time"}
 
     defs = reg.tool_definitions
     names = {d["function"]["name"] for d in defs}

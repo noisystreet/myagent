@@ -57,3 +57,48 @@ class TestCommandTools:
         r = run_command("sleep 5", timeout=1)
         assert not r.success
         assert r.error["type"] == "timeout"
+
+
+class TestTimeTools:
+    def test_get_time_default_local(self):
+        from src.tools.time_tools import get_time
+
+        r = get_time()
+        assert r.success
+        assert r.tool_name == "get_time"
+        assert "timezone" in r.data
+        assert "iso" in r.data
+        assert "datetime" in r.data
+        assert "date" in r.data
+        assert "time" in r.data
+        assert "weekday" in r.data
+        assert "timestamp" in r.data
+
+        # Verify timestamp is recent (within last 10 seconds)
+        import time as time_mod
+
+        now_ts = int(time_mod.time())
+        assert abs(r.data["timestamp"] - now_ts) < 10
+
+    def test_get_time_utc(self):
+        from src.tools.time_tools import get_time
+
+        r = get_time(tz="UTC")
+        assert r.success
+        assert r.data["timezone"] == "UTC"
+        # UTC ISO format should end with +00:00
+        assert r.data["iso"].endswith("+00:00")
+
+    def test_get_time_explicit_tz(self):
+        from src.tools.time_tools import get_time
+
+        r = get_time(tz="Asia/Shanghai")
+        assert r.success
+        assert r.data["timezone"] == "Asia/Shanghai"
+
+    def test_get_time_invalid_timezone(self):
+        from src.tools.time_tools import get_time
+
+        r = get_time(tz="Invalid/Zone")
+        assert not r.success
+        assert r.error["type"] == "invalid_timezone"
