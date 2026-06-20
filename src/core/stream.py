@@ -8,7 +8,7 @@ import logging
 import sys
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -97,66 +97,86 @@ def run_streaming(
 
 def _event_from_node(node_name: str, output: dict) -> StreamEvent:
     """Convert a node's raw output dict into a display event."""
-    # intent_router: shows routing decision
-    if node_name == "intent_router":
-        mode = output.get("mode", "?")
-        return StreamEvent(
-            node=node_name,
-            kind="start",
-            content=f"Routing: {mode} mode",
-            data=output,
-        )
+    handler = _NODE_HANDLERS.get(node_name, _default_handler)
+    return handler(node_name, output)
 
-    # planner: shows generated plan
-    if node_name == "planner":
-        plan = output.get("plan", [])
-        plan_str = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(plan))
-        return StreamEvent(
-            node=node_name,
-            kind="interim",
-            content=f"Plan ({len(plan)} steps):\n{plan_str}" if plan else "No plan generated",
-            data=output,
-        )
 
-    # executor: shows tool calls and results
-    if node_name == "executor":
-        tool_results = output.get("tool_results", [])
-        errors = output.get("errors", [])
-        parts = []
-        for r in tool_results:
-            status = "✓" if r.success else "✗"
-            parts.append(f"  {status} {r.tool_name}" + (f": {r.data[:120]}" if r.data else ""))
-        if errors:
-            for e in errors:
-                parts.append(f"  ⚠ {e[:120]}")
+def _handle_intent_router(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the intent_router node."""
+    mode = output.get("mode", "?")
+    return StreamEvent(
+        node=node_name,
+        kind="start",
+        content=f"Routing: {mode} mode",
+        data=output,
+    )
 
-        return StreamEvent(
-            node=node_name,
-            kind="tool_result" if tool_results else "error",
-            content="\n".join(parts) if parts else "Executing...",
-            data=output,
-        )
 
-    # chat: conversation response
-    if node_name == "chat":
-        raw = output.get("final_output", "")
-        if not raw:
-            msgs = output.get("messages", [])
-            raw = str(msgs[-1].get("content", "")) if msgs else ""
-        return StreamEvent(
-            node=node_name,
-            kind="interim",
-            content=str(raw),
-            data=output,
-        )
+def _handle_planner(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the planner node."""
+    plan = output.get("plan", [])
+    plan_str = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(plan))
+    return StreamEvent(
+        node=node_name,
+        kind="interim",
+        content=f"Plan ({len(plan)} steps):\n{plan_str}" if plan else "No plan generated",
+        data=output,
+    )
 
-    # output: final result
-    if node_name == "output":
-        return StreamEvent(
-            node=node_name,
-            kind="end",
-            content=output.get("final_output", "") or "Done.",
-            data=output,
-        )
 
+def _handle_executor(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the executor node."""
+    tool_results = output.get("tool_results", [])
+    errors = output.get("errors", [])
+    parts: list[str] = []
+    for r in tool_results:
+        status = "✓" if r.success else "✗"
+        parts.append(f"  {status} {r.tool_name}" + (f": {r.data[:120]}" if r.data else ""))
+    if errors:
+        for e in errors:
+            parts.append(f"  ⚠ {e[:120]}")
+
+    return StreamEvent(
+        node=node_name,
+        kind="tool_result" if tool_results else "error",
+        content="\n".join(parts) if parts else "Executing...",
+        data=output,
+    )
+
+
+def _handle_chat(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the chat node."""
+    raw = output.get("final_output", "")
+    if not raw:
+        msgs = output.get("messages", [])
+        raw = str(msgs[-1].get("content", "")) if msgs else ""
+    return StreamEvent(
+        node=node_name,
+        kind="interim",
+        content=str(raw),
+        data=output,
+    )
+
+
+def _handle_output(node_name: str, output: dict) -> StreamEvent:
+    """Build event for the output node."""
+    return StreamEvent(
+        node=node_name,
+        kind="end",
+        content=output.get("final_output", "") or "Done.",
+        data=output,
+    )
+
+
+def _default_handler(node_name: str, output: dict) -> StreamEvent:
+    """Fallback handler for unknown nodes."""
     return StreamEvent(node=node_name, kind="interim", content=str(output), data=output)
+
+
+_NODE_HANDLERS: dict[str, Callable[[str, dict], StreamEvent]] = {
+    "intent_router": _handle_intent_router,
+    "planner": _handle_planner,
+    "executor": _handle_executor,
+    "chat": _handle_chat,
+    "output": _handle_output,
+}
