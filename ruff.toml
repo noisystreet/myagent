@@ -15,9 +15,9 @@ select = ["E", "F", "W", "I", "N", "UP", "C9", "PL"]
 "src/llm/client.py" = ["PLR0913"]
 "src/nodes/planner.py" = ["E501"]
 "src/tools/command_tools.py" = ["PLW1509"]
-"src/main.py" = ["PLR0915"]
-"src/nodes/executor.py" = ["PLR0915"]
-"src/tools/file_tools.py" = ["PLR0915"]
+"src/main.py" = ["PLW0717"]
+"src/nodes/executor.py" = ["PLW0717"]
+"src/tools/file_tools.py" = ["PLW0717"]
 
 [lint.mccabe]
 max-complexity = 10
