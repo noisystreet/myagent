@@ -1,6 +1,74 @@
 """Tests for executor tool call parser."""
 
-from src.nodes.executor import _parse_tool_call
+from src.nodes.executor import (
+    _extract_tool_call_from_response,
+    _parse_tool_call,
+)
+
+
+class TestExtractToolCall:
+    """Test DeepSeek / OpenAI native tool call extraction."""
+
+    def test_deepseek_tool_calls_format(self):
+        """DeepSeek API response with tool_calls array."""
+        response = {
+            "tool_calls": [
+                {
+                    "function": {
+                        "name": "read_file",
+                        "arguments": '{"path": "src/main.py"}',
+                    }
+                }
+            ]
+        }
+        result = _extract_tool_call_from_response(response)
+        assert result is not None
+        name, args = result
+        assert name == "read_file"
+        assert args["path"] == "src/main.py"
+
+    def test_openai_function_call_format(self):
+        """OpenAI legacy function_call dict."""
+        response = {
+            "function_call": {
+                "name": "write_file",
+                "arguments": '{"path": "hello.py", "content": "hi"}',
+            }
+        }
+        result = _extract_tool_call_from_response(response)
+        assert result is not None
+        name, args = result
+        assert name == "write_file"
+        assert args["path"] == "hello.py"
+
+    def test_langchain_aimessage_tool_calls(self):
+        """LangChain AIMessage with tool_calls attribute."""
+        class FakeAIMessage:
+            tool_calls = [
+                {"name": "run_command", "args": {"command": "ls"}},
+            ]
+
+        result = _extract_tool_call_from_response(FakeAIMessage())
+        assert result is not None
+        name, args = result
+        assert name == "run_command"
+        assert args["command"] == "ls"
+
+    def test_unknown_tool_skipped(self):
+        """Unknown tool names should be ignored."""
+        response = {
+            "tool_calls": [
+                {"function": {"name": "unknown_tool", "arguments": "{}"}}
+            ]
+        }
+        result = _extract_tool_call_from_response(response)
+        assert result is None
+
+    def test_no_tool_calls_returns_none(self):
+        """Plain text or empty dict returns None."""
+        assert _extract_tool_call_from_response("plain text") is None
+        assert _extract_tool_call_from_response({}) is None
+        assert _extract_tool_call_from_response(None) is None
 
 
 class TestParseToolCall:

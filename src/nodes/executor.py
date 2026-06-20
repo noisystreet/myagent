@@ -4,6 +4,7 @@ import json
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from ..core.state import CodingAgentState, ToolResult
 from ..llm.client import LLMClient
@@ -29,6 +30,76 @@ read_file(path="src/main.py")
 run_command(command="python hello.py")
 """
 
+# AI-generated: OpenAI/DeepSeek compatible tool definitions for bind_tools
+TOOL_DEFINITIONS: list[dict] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the content of a file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative file path"},
+                    "offset": {"type": "integer", "description": "Start line (1-based, optional)"},
+                    "limit": {"type": "integer", "description": "Max lines to read (optional)"},
+                },
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Write content to a file (creates or overwrites).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative file path"},
+                    "content": {"type": "string", "description": "File content"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_file",
+            "description": "Edit a file by replacing old_str with new_str.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative file path"},
+                    "old_str": {"type": "string", "description": "Text to replace"},
+                    "new_str": {"type": "string", "description": "Replacement text"},
+                },
+                "required": ["path", "old_str", "new_str"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": "Run a shell command in the project workspace.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Shell command to execute"},
+                    "cwd": {
+                        "type": "string",
+                        "description": "Working directory (optional)",
+                    },
+                    "timeout": {"type": "integer", "description": "Timeout in seconds (optional)"},
+                },
+                "required": ["command"],
+            },
+        },
+    },
+]
+
 
 def executor_node(state: CodingAgentState, llm: LLMClient) -> dict:
     """Execute the current step using LLM-selected tools."""
@@ -38,18 +109,26 @@ def executor_node(state: CodingAgentState, llm: LLMClient) -> dict:
     response = llm.invoke(
         prompt=f"Current step: {step}\n\nRespond with the tool call only.",
         system=EXECUTOR_SYSTEM_PROMPT,
+        tools=TOOL_DEFINITIONS,
     )
 
     results: list[ToolResult] = []
-    tool_call = _parse_tool_call(str(response).strip())
+
+    # Strategy 1: Native tool_calls (DeepSeek / OpenAI bind_tools format)
+    tool_call = _extract_tool_call_from_response(response)
     if tool_call:
         results.append(_resolve_and_run(tool_call, workspace))
     else:
-        results.append(
-            ToolResult(
-                "parse", False, error=f"Could not parse tool call from: {str(response)[:200]}"
+        # Strategy 2: Text-based parsing (fallback)
+        tool_call = _parse_tool_call(str(response).strip())
+        if tool_call:
+            results.append(_resolve_and_run(tool_call, workspace))
+        else:
+            results.append(
+                ToolResult(
+                    "parse", False, error=f"Could not parse tool call from: {str(response)[:200]}"
+                )
             )
-        )
 
     errors = [r.error for r in results if not r.success]
 
@@ -104,6 +183,70 @@ def _parse_tool_call(text: str) -> tuple[str, dict] | None:
 KNOWN_TOOLS = {"read_file", "write_file", "edit_file", "run_command"}
 
 
+def _parse_function_args(func: dict) -> tuple[str, dict]:
+    """Parse function name and arguments from a DeepSeek/OpenAI function dict."""
+    name = func.get("name", "")
+    args_str = func.get("arguments", "{}")
+    try:
+        args = json.loads(args_str) if isinstance(args_str, str) else args_str
+    except json.JSONDecodeError:
+        args = {}
+    return name, args
+
+
+def _extract_from_aimessage(response: Any) -> tuple[str, dict] | None:
+    """Extract tool call from LangChain AIMessage.tool_calls."""
+    if not (hasattr(response, "tool_calls") and response.tool_calls):
+        return None
+    for tc in response.tool_calls:
+        if isinstance(tc, dict):
+            name = tc.get("name", "")
+            args = tc.get("args", {})
+            if name in KNOWN_TOOLS:
+                return name, args
+    return None
+
+
+def _extract_from_dict(response: dict) -> tuple[str, dict] | None:
+    """Extract tool call from raw dict (DeepSeek API response)."""
+    # {"tool_calls": [{"function": {...}}]}
+    tcs = response.get("tool_calls")
+    if isinstance(tcs, list):
+        for tc in tcs:
+            if isinstance(tc, dict) and "function" in tc:
+                name, args = _parse_function_args(tc["function"])
+                if name in KNOWN_TOOLS:
+                    return name, args
+
+    # {"function_call": {...}}
+    fc = response.get("function_call")
+    if isinstance(fc, dict):
+        name, args = _parse_function_args(fc)
+        if name in KNOWN_TOOLS:
+            return name, args
+
+    return None
+
+
+def _extract_tool_call_from_response(response: Any) -> tuple[str, dict] | None:
+    """Extract tool call from LangChain AIMessage or raw dict.
+
+    Supports DeepSeek / OpenAI native tool_calls format:
+      - AIMessage with .tool_calls [{"name": ..., "args": ...}]
+      - Dict with {"tool_calls": [{"function": {"name": ..., "arguments": ...}}]}
+      - Dict with {"function_call": {"name": ..., "arguments": ...}}
+    """
+    # AI-generated
+    result = _extract_from_aimessage(response)
+    if result:
+        return result
+
+    if isinstance(response, dict):
+        return _extract_from_dict(response)
+
+    return None
+
+
 def _try_parse_json(text: str) -> tuple[str, dict] | None:
     """Try to parse as JSON format."""
     for candidate in _collect_json_candidates(text):
@@ -111,6 +254,11 @@ def _try_parse_json(text: str) -> tuple[str, dict] | None:
             parsed = json.loads(candidate)
         except (json.JSONDecodeError, TypeError):
             continue
+        # First try DeepSeek / OpenAI native formats
+        result = _extract_tool_call_from_response(parsed)
+        if result:
+            return result
+        # Then try legacy formats
         result = _parse_json_as_tool_call(parsed)
         if result:
             return result
