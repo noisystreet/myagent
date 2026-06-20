@@ -12,7 +12,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from .core.config import AgentConfig
 from .core.graph import build_graph
 from .core.state import CodingAgentState
-from .core.stream import run_streaming
+from .core.stream import Spinner, run_streaming
 from .llm.client import LLMClient
 
 load_dotenv()
@@ -43,9 +43,15 @@ def run_once(graph, state: CodingAgentState, task: str, config: dict) -> CodingA
     state["messages"].append(HumanMessage(content=task))
     logger.info("Running: %s", task)
     final_state = state
+    spinner = Spinner("Thinking...")
+    spinner.start()
     for event in run_streaming(graph, state, config):
+        spinner.stop()
         _display_stream_event(event)
         final_state = event.data
+        spinner = Spinner("Thinking...")
+        spinner.start()
+    spinner.stop()
     return final_state
 
 
@@ -79,13 +85,22 @@ def _parse_args():
     parser.add_argument(
         "--max-steps", type=int, default=20, help="Maximum execution steps (default: 20)"
     )
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v INFO, -vv DEBUG)",
+    )
     return parser.parse_args()
+
+
+_LOG_LEVELS: list[int] = [logging.WARNING, logging.INFO, logging.DEBUG]
 
 
 def _build_config(args):
     """Build AgentConfig from parsed args."""
-    log_level = logging.DEBUG if args.verbose else logging.INFO
+    log_level = _LOG_LEVELS[min(args.verbose, len(_LOG_LEVELS) - 1)]
     logging.basicConfig(
         level=log_level, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
     )

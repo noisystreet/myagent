@@ -11,7 +11,7 @@ preview = true
 select = ["E", "F", "W", "I", "N", "UP", "C9", "PL"]
 
 [lint.per-file-ignores]
-"tests/*" = ["PLR0915", "C901", "PLR0911"]
+"tests/*" = ["PLR0915", "C901", "PLR0911", "PLR6301", "PLC2701"]
 "src/llm/client.py" = ["PLR0913"]
 "src/nodes/planner.py" = ["E501"]
 "src/tools/command_tools.py" = ["PLW1509"]
