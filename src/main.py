@@ -17,9 +17,11 @@ from .core.display import (
     display_turn_summary,
 )
 from .core.graph import build_graph
+from .core.registry import ToolRegistry
 from .core.state import CodingAgentState
 from .core.stream import Spinner, run_streaming
 from .llm.client import LLMClient
+from .tools import ALL_TOOLS
 
 load_dotenv()
 
@@ -121,7 +123,8 @@ def _build_config(args):
 def _setup(config):
     """Initialize LLM, graph, and workspace."""
     llm = LLMClient(model_name=config.model, api_key=config.api_key, base_url=config.base_url)
-    graph = build_graph(llm, MemorySaver())
+    registry = ToolRegistry(ALL_TOOLS)
+    graph = build_graph(llm, registry, MemorySaver())
     workspace = Path(config.workspace).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
     logger.info("Workspace: %s | Model: %s", workspace, config.model)

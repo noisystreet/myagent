@@ -5,6 +5,8 @@ from src.nodes.executor import (
     _parse_tool_call,
 )
 
+KNOWN_TOOLS = {"read_file", "write_file", "edit_file", "run_command"}
+
 
 class TestExtractToolCall:
     """Test DeepSeek / OpenAI native tool call extraction."""
@@ -21,7 +23,7 @@ class TestExtractToolCall:
                 }
             ]
         }
-        result = _extract_tool_call_from_response(response)
+        result = _extract_tool_call_from_response(response, KNOWN_TOOLS)
         assert result is not None
         name, args = result
         assert name == "read_file"
@@ -35,7 +37,7 @@ class TestExtractToolCall:
                 "arguments": '{"path": "hello.py", "content": "hi"}',
             }
         }
-        result = _extract_tool_call_from_response(response)
+        result = _extract_tool_call_from_response(response, KNOWN_TOOLS)
         assert result is not None
         name, args = result
         assert name == "write_file"
@@ -48,7 +50,7 @@ class TestExtractToolCall:
                 {"name": "run_command", "args": {"command": "ls"}},
             ]
 
-        result = _extract_tool_call_from_response(FakeAIMessage())
+        result = _extract_tool_call_from_response(FakeAIMessage(), KNOWN_TOOLS)
         assert result is not None
         name, args = result
         assert name == "run_command"
@@ -61,20 +63,20 @@ class TestExtractToolCall:
                 {"function": {"name": "unknown_tool", "arguments": "{}"}}
             ]
         }
-        result = _extract_tool_call_from_response(response)
+        result = _extract_tool_call_from_response(response, KNOWN_TOOLS)
         assert result is None
 
     def test_no_tool_calls_returns_none(self):
         """Plain text or empty dict returns None."""
-        assert _extract_tool_call_from_response("plain text") is None
-        assert _extract_tool_call_from_response({}) is None
-        assert _extract_tool_call_from_response(None) is None
+        assert _extract_tool_call_from_response("plain text", KNOWN_TOOLS) is None
+        assert _extract_tool_call_from_response({}, KNOWN_TOOLS) is None
+        assert _extract_tool_call_from_response(None, KNOWN_TOOLS) is None
 
 
 class TestParseToolCall:
     def test_function_call_format(self):
         r = _parse_tool_call(
-            'write_file(path="hello.py", content="print(\'hi\')")'
+            'write_file(path="hello.py", content="print(\'hi\')")', KNOWN_TOOLS
         )
         assert r is not None
         name, args = r
@@ -82,14 +84,14 @@ class TestParseToolCall:
         assert args["path"] == "hello.py"
 
     def test_run_command(self):
-        r = _parse_tool_call('run_command(command="python hello.py")')
+        r = _parse_tool_call('run_command(command="python hello.py")', KNOWN_TOOLS)
         assert r is not None
         name, args = r
         assert name == "run_command"
         assert args["command"] == "python hello.py"
 
     def test_read_file(self):
-        r = _parse_tool_call('read_file(path="src/main.py")')
+        r = _parse_tool_call('read_file(path="src/main.py")', KNOWN_TOOLS)
         assert r is not None
         name, args = r
         assert name == "read_file"
@@ -97,13 +99,13 @@ class TestParseToolCall:
 
     def test_json_format(self):
         r = _parse_tool_call(
-            '{"tool": "read_file", "args": {"path": "test.py"}}'
+            '{"tool": "read_file", "args": {"path": "test.py"}}', KNOWN_TOOLS
         )
         assert r is not None
         assert r[0] == "read_file"
 
     def test_free_text_inference(self):
-        r = _parse_tool_call("We need to read the file main.py using read_file")
+        r = _parse_tool_call("We need to read the file main.py using read_file", KNOWN_TOOLS)
         assert r is not None
         name, args = r
         assert name == "read_file"
@@ -111,9 +113,9 @@ class TestParseToolCall:
 
     def test_done(self):
         """DONE should result in no parseable tool call."""
-        r = _parse_tool_call("DONE")
+        r = _parse_tool_call("DONE", KNOWN_TOOLS)
         assert r is None
 
     def test_gibberish(self):
-        r = _parse_tool_call("asdfghjkl")
+        r = _parse_tool_call("asdfghjkl", KNOWN_TOOLS)
         assert r is None
