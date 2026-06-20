@@ -3,6 +3,7 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from ..core.registry import ToolRegistry
 from ..core.state import CodingAgentState
 from ..llm.client import LLMClient
 from ..nodes.chat import chat_node
@@ -21,7 +22,11 @@ def should_continue(state: CodingAgentState) -> str:
     return state.get("next_action", "end")
 
 
-def build_graph(llm: LLMClient, checkpointer: MemorySaver | None = None) -> StateGraph:
+def build_graph(
+    llm: LLMClient,
+    registry: ToolRegistry,
+    checkpointer: MemorySaver | None = None,
+) -> StateGraph:
     """Build the coding agent state graph.
 
     Topology:
@@ -33,11 +38,11 @@ def build_graph(llm: LLMClient, checkpointer: MemorySaver | None = None) -> Stat
     """
     builder = StateGraph(CodingAgentState)
 
-    # Add nodes — inject LLM via closure
+    # Add nodes — inject LLM and registry via closure
     builder.add_node("intent_router", lambda s: intent_router_node(s, llm))
     builder.add_node("chat", lambda s: chat_node(s, llm))
     builder.add_node("planner", lambda s: planner_node(s, llm))
-    builder.add_node("executor", lambda s: executor_node(s, llm))
+    builder.add_node("executor", lambda s: executor_node(s, llm, registry))
     builder.add_node("output", lambda s: output_node(s, llm))
 
     # Start → intent router
