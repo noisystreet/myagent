@@ -18,12 +18,17 @@ def read_file(path: str, offset: int = 1, limit: int = 500) -> ToolResult:
     try:
         filepath = Path(path).resolve()
         if not filepath.exists():
-            return ToolResult("read_file", False, error=f"File not found: {path}")
-        if filepath.stat().st_size > MAX_FILE_SIZE:
             return ToolResult(
                 "read_file",
                 False,
-                error=f"File too large ({filepath.stat().st_size} bytes), max {MAX_FILE_SIZE}",
+                error={"type": "file_not_found", "message": f"File not found: {path}"},
+            )
+        if filepath.stat().st_size > MAX_FILE_SIZE:
+            size_msg = f"File too large ({filepath.stat().st_size} bytes), max {MAX_FILE_SIZE}"
+            return ToolResult(
+                "read_file",
+                False,
+                error={"type": "file_too_large", "message": size_msg},
             )
 
         lines = filepath.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -32,14 +37,18 @@ def read_file(path: str, offset: int = 1, limit: int = 500) -> ToolResult:
         selected = lines[offset - 1 : offset - 1 + limit]
 
         result = "".join(selected)
-        summary = (
-            f"File: {path} ({total_lines} lines total, showing {len(selected)} lines)\n" + result
+        return ToolResult(
+            "read_file",
+            True,
+            data={
+                "file": str(path),
+                "total_lines": total_lines,
+                "shown_lines": len(selected),
+                "content": result,
+            },
         )
-        if offset + limit < total_lines:
-            summary += f"\n... ({total_lines - offset - limit + 1} more lines)"
-        return ToolResult("read_file", True, data=summary)
     except Exception as e:
-        return ToolResult("read_file", False, error=str(e))
+        return ToolResult("read_file", False, error={"type": "exception", "message": str(e)})
 
 
 def write_file(path: str, content: str) -> ToolResult:
@@ -51,10 +60,10 @@ def write_file(path: str, content: str) -> ToolResult:
         return ToolResult(
             "write_file",
             True,
-            data=f"Written {len(content)} bytes to {path}",
+            data={"file": str(path), "bytes_written": len(content)},
         )
     except Exception as e:
-        return ToolResult("write_file", False, error=str(e))
+        return ToolResult("write_file", False, error={"type": "exception", "message": str(e)})
 
 
 def edit_file(path: str, old_str: str, new_str: str) -> ToolResult:
@@ -65,14 +74,21 @@ def edit_file(path: str, old_str: str, new_str: str) -> ToolResult:
     try:
         filepath = Path(path).resolve()
         if not filepath.exists():
-            return ToolResult("edit_file", False, error=f"File not found: {path}")
+            return ToolResult(
+                "edit_file",
+                False,
+                error={"type": "file_not_found", "message": f"File not found: {path}"},
+            )
 
         content = filepath.read_text(encoding="utf-8")
         if old_str not in content:
             return ToolResult(
                 "edit_file",
                 False,
-                error=f"String to replace not found in {path}",
+                error={
+                    "type": "string_not_found",
+                    "message": f"String to replace not found in {path}",
+                },
             )
 
         new_content = content.replace(old_str, new_str, 1)
@@ -80,7 +96,7 @@ def edit_file(path: str, old_str: str, new_str: str) -> ToolResult:
         return ToolResult(
             "edit_file",
             True,
-            data=f"Replaced 1 occurrence in {path}",
+            data={"file": str(path), "replacements": 1},
         )
     except Exception as e:
-        return ToolResult("edit_file", False, error=str(e))
+        return ToolResult("edit_file", False, error={"type": "exception", "message": str(e)})

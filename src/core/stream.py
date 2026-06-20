@@ -131,7 +131,8 @@ def _handle_executor(node_name: str, output: dict) -> StreamEvent:
     parts: list[str] = []
     for r in tool_results:
         status = "✓" if r.success else "✗"
-        parts.append(f"  {status} {r.tool_name}" + (f": {r.data[:120]}" if r.data else ""))
+        text = r.to_text()
+        parts.append(f"  {status} {r.tool_name}" + (f": {text[:120]}" if text else ""))
     if errors:
         for e in errors:
             parts.append(f"  ⚠ {e[:120]}")

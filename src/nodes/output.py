@@ -22,7 +22,7 @@ def output_node(state: CodingAgentState, llm: LLMClient) -> dict:
     errors = state.get("errors", [])
 
     result_summary = "\n".join(
-        f"  [{'✓' if r.success else '✗'}] {r.tool_name}: {r.data or r.error or ''}" for r in results
+        f"  [{'✓' if r.success else '✗'}] {r.tool_name}: {r.to_text()}" for r in results
     )
 
     summary = llm.invoke(
