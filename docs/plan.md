@@ -28,6 +28,7 @@ Core MVP → Reliability → Memory  → HITL     → Ship
 | **P3** | Memory Persistence | Week 5 | Cross-session memory, project context awareness |
 | **P4** | HITL + Cost Control | Week 6 | Production-grade agent with user intervention and cost management |
 | **P5** | Test & Ship | Week 7-8 | Benchmarked, documented, deliverable version |
+| **P6** | Ecosystem (MCP + Skill) | Week 9-12 | Extensible agent with MCP tool discovery and pluggable skills |
 
 ---
 
@@ -354,10 +355,112 @@ prompts/
 
 ---
 
+## Phase 6: Ecosystem (MCP + Skill) (Weeks 9-12)
+
+**Goal**: Make the agent extensible — dynamically discover and call MCP tools, and support pluggable Skills for domain-specific capabilities.
+
+### Background
+
+- **MCP (Model Context Protocol)** is an open protocol by Anthropic that standardizes how LLM applications discover and call external tools. Any MCP Server can be dynamically plugged in.
+- **Skill** is a self-contained capability package (prompt + tools + knowledge) that the agent can load on demand for domain-specific scenarios.
+
+### 6.1 MCP Client Core (Day 43-46)
+
+- [ ] Implement `mcp/client.py` — MCP protocol client supporting stdio transport
+  - `connect()` — spawn MCP Server subprocess, establish JSON-RPC connection
+  - `list_tools()` — discover server capabilities
+  - `call_tool()` — invoke a tool and return results
+  - `close()` — gracefully shut down the connection
+- [ ] Implement `mcp/transport.py` — transport abstraction layer
+  - `StdioTransport` — subprocess-based for local MCP Servers
+  - `SSETransport` — HTTP SSE-based for remote MCP Servers (future)
+- [ ] Implement `mcp/schema.py` — MCP protocol types (JSON-RPC message, tool definition, etc.)
+- [ ] Unit tests for MCP client with a mock server
+
+### 6.2 MCP Registry & Integration (Day 47-50)
+
+- [ ] Implement `mcp/registry.py` — manage multiple MCP Server connections
+  - `discover_all(configs)` — connect all configured servers, collect tools
+  - `get_dynamic_tools()` — return all MCP tools as `ToolDef` list
+- [ ] Implement user configuration file `mcp_servers.yaml`
+  - stdio mode: command + args to spawn local servers
+  - sse mode: URL + headers for remote servers (future)
+- [ ] Integrate into `executor_node`: dynamic tools join the available tool pool alongside built-in tools
+- [ ] Add `mcp_tool_call()` to `tools/` — call MCP tools via registry
+- [ ] Add config to `AgentConfig`: `mcp_servers_path`
+
+### 6.3 Skill System Core (Day 51-54)
+
+- [ ] Define `skills/<name>/skill.yaml` format
+  - Metadata: name, version, description, triggers
+  - Tools: builtin tools to enable, MCP servers to connect
+  - Prompt: reference to `prompt.md`
+  - Knowledge: list of knowledge documents
+  - Config: skill-specific parameters
+- [ ] Implement `skills/registry.py`
+  - `scan(path)` — discover all skills in a directory
+  - `match(input)` — match user input against skill triggers
+  - `load(name)` — load a skill's full definition
+- [ ] Implement `skills/loader.py`
+  - Parse `skill.yaml` frontmatter
+  - Load `prompt.md` content
+  - Load knowledge documents into context
+- [ ] Implement `nodes/skill_router.py` — route matched input to skill executor
+  - Two paths: skill match → skill_executor, no match → planner
+- [ ] Add config to `AgentConfig`: `skills_dir`
+
+```
+Agent flow with skills:
+
+User Input → intent_router
+                │
+                ├── chat → chat_node
+                │
+                └── task → skill_router (new)
+                              │
+                              ├── skill match → skill_executor (new)
+                              │                    └── MCP tools available
+                              │
+                              └── no match → planner → executor
+                                                          ├── file_tools
+                                                          ├── command_tools
+                                                          └── mcp_tools (new)
+```
+
+### 6.4 Skill-MCP Integration (Day 55-57)
+
+- [ ] Skills can declare MCP server dependencies in `skill.yaml`
+  - On skill load, auto-connect required MCP Servers
+  - On skill unload, disconnect associated MCP Servers
+- [ ] Implement skill lifecycle hooks
+  - `on_load(skill, context)` — setup
+  - `on_unload(skill, context)` — cleanup
+- [ ] Skill context injection: loaded knowledge docs appended to system prompt
+
+### 6.5 Example Skills & Documentation (Day 58-60)
+
+- [ ] Build `skills/code-reviewer/` — code review skill
+  - Builtin tools: read_file, grep, glob
+  - Knowledge: Python best practices, security patterns
+- [ ] Build `skills/web-developer/` — web development skill
+  - Builtin tools: read_file, write_file, run_command
+  - Knowledge: React patterns, CSS guide, accessibility checklist
+- [ ] Update README with MCP + Skill usage documentation
+- [ ] Add example `mcp_servers.yaml` to `.env.example`
+
+### P6 Milestone
+
+> ✅ Agent can discover and call MCP tools from any MCP Server
+> ✅ User configures MCP Servers via a single YAML file
+> ✅ Skills auto-load on intent match, bringing domain-specific prompt + tools
+> ✅ At least 2 example skills shipped
+
+---
+
 ## Delivery Roadmap
 
 ```
-Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Week 8
+Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Week 8     Week 9-12
 ├─P1: Core MVP───────┤
 │ Scaffold State LLM  │
 │ Tools  Nodes Graph  │
@@ -377,6 +480,12 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
                                                                                  │ Unit Integ E2E │
                                                                                  │ Observability  │
                                                                                  │ Docs           │
+                                                                                                ├─P6: MCP+Skill────
+                                                                                                │ MCP Client Core  │
+                                                                                                │ MCP Registry     │
+                                                                                                │ Skill System     │
+                                                                                                │ Integration      │
+                                                                                                │ Example Skills   │
 ```
 
 ---
@@ -388,7 +497,9 @@ P1 ─── required ───→ P2 ─── required ───→ P3
                                               │
                                               ├──→ P4 (depends on P2, P3 optional)
                                               │
-                                              └──→ P5 (depends on P1-P4 complete)
+                                              ├──→ P5 (depends on P1-P4 complete)
+                                              │
+                                              └──→ P6 (depends on P1-P2, P3-P5 optional)
 ```
 
 - **P1** is the prerequisite for all phases
@@ -396,6 +507,7 @@ P1 ─── required ───→ P2 ─── required ───→ P3
 - **P3** requires P2's Prompt template management as a base for memory retrieval integration
 - **P4**'s HITL depends on P2's security validation (confirm mode needs to recognize dangerous operations)
 - **P5** testing is based on P1-P4's complete codebase
+- **P6** MCP core depends on P2's Security (sandbox for running MCP servers); Skill depends on P1's executor and tool model
 
 ---
 
@@ -409,6 +521,8 @@ P1 ─── required ───→ P2 ─── required ───→ P3
 | Security sandbox blocks legitimate commands | P2 | Medium | Configurable allowlist, clear reason on block |
 | User requirement ambiguity leads to wrong actions | P4 | High | Guidance mode proactively asks when uncertain |
 | Benchmark metrics below target (<80% completion) | P5 | Medium | Iterate on Evaluator and Prompt optimization |
+| MCP Server instability (crash, hang) | P6 | Medium | Health check + auto-restart + timeout per call |
+| Skill trigger false positives | P6 | Medium | Multi-factor matching (pattern + file type + user confirm) |
 
 ---
 
@@ -441,3 +555,11 @@ P1 ─── required ───→ P2 ─── required ───→ P3
 - [ ] E2E benchmark completion rate ≥ 80%
 - [ ] `pip install .` installable, `myagent --help` works
 - [ ] README includes quick-start example
+
+### P6 Completion Check
+- [ ] MCP client connects to stdio-based MCP Server and calls tools
+- [ ] Tools from MCP Server appear in executor's tool pool
+- [ ] Skills auto-match on user input and load prompt + tools
+- [ ] Skill can declare MCP dependencies and connect on load
+- [ ] At least 2 example skills (`code-reviewer`, `web-developer`) are functional
+- [ ] `mcp_servers.yaml` configuration documented and working
